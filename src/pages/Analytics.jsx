@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { BookOpen, CheckCircle2, Clock, AlertTriangle, Layers, Building2 } from 'lucide-react';
 import StatCard from '../components/StatCard';
-import { useData, computeStats, CHART_COLORS } from '../data/sampleData';
+import { useData, computeStats, CHART_COLORS, examSubjects } from '../data/sampleData';
 
 const Box = ({ title, children }) => (
   <div className="card p-4"><h2 className="mb-2 text-sm font-semibold text-slate-900">{title}</h2><div className="h-64">{children}</div></div>
@@ -18,7 +18,7 @@ export default function Analytics() {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-        <StatCard icon={BookOpen} tone="blue" label="Total examinations" value={data.subjects.length} />
+        <StatCard icon={BookOpen} tone="blue" label="Total examinations" value={examSubjects(data).length} />
         <StatCard icon={CheckCircle2} tone="green" label="Scheduled" value={s.scheduled} />
         <StatCard icon={Clock} tone="orange" label="Unscheduled" value={s.unscheduled} />
         <StatCard icon={AlertTriangle} tone={s.conflicts.length ? 'red' : 'green'} label="Total conflicts" value={s.conflicts.length} />

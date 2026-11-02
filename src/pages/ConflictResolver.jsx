@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, ArrowRight, Wand2, ShieldCheck, ShieldAler
 import StatCard from '../components/StatCard';
 import { Badge } from '../components/DataTable';
 import { Modal, ConfirmDialog } from '../components/Modal';
-import { useData, slotLabel, CONFLICT_TYPES } from '../data/sampleData';
+import { useData, slotLabel, CONFLICT_TYPES, examSubjects } from '../data/sampleData';
 import { validateSchedule, validateEntry, suggestAlternatives, cmpSlots } from '../algorithms/schedulingAlgorithms';
 
 const TYPE_COLOR = { Student: 'red', Room: 'orange', Faculty: 'violet', Capacity: 'orange', Availability: 'blue' };
@@ -15,7 +15,8 @@ export default function ConflictResolver() {
   const slotMap = Object.fromEntries(data.slots.map((s) => [s.id, s]));
   const roomMap = Object.fromEntries(data.rooms.map((r) => [r.id, r]));
   const entryOf = (id, tt = data.timetable) => tt.find((e) => e.subjectId === id);
-  const unscheduled = data.subjects.filter((s) => !entryOf(s.id));
+  const examSubs = examSubjects(data);
+  const unscheduled = examSubs.filter((s) => !entryOf(s.id));
 
   const [active, setActive] = useState(null);
   const [moveId, setMoveId] = useState('');
@@ -131,7 +132,7 @@ export default function ConflictResolver() {
         <p className="mb-4 text-xs text-slate-500">Move an exam yourself. Invalid placements are rejected. Use “Save anyway” only to create a demo conflict and then resolve it above.</p>
         <div className="grid gap-3 md:grid-cols-4">
           <select className="input" value={manual.subjectId} onChange={(e) => { setManual({ ...manual, subjectId: e.target.value }); setReport(null); }}>
-            <option value="">Subject…</option>{data.subjects.map((s) => <option key={s.id} value={s.id}>{s.code} – {s.name}</option>)}
+            <option value="">Subject…</option>{examSubs.map((s) => <option key={s.id} value={s.id}>{s.code} – {s.name}</option>)}
           </select>
           <select className="input" value={manual.slotId} onChange={(e) => { setManual({ ...manual, slotId: e.target.value }); setReport(null); }}>
             <option value="">Time slot…</option>{slotsSorted.map((s) => <option key={s.id} value={s.id}>{slotLabel(s)}{s.available ? '' : ' (unavailable)'}</option>)}

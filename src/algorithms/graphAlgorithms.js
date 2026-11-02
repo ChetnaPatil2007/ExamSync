@@ -1,9 +1,15 @@
 // ============================================================
-//  graphAlgorithms.js – Conflict graph G = (V, E)
+//  graphAlgorithms.js – Sets + Conflict graph G = (V, E)
 //  Vertices = subjects, edge = the two subjects share a student
+//  (the small set helpers that used to live in mathOperations.js are here now)
 // ============================================================
-import { intersection } from './mathOperations';
 
+// ---------- sets ----------
+export const union = (a, b) => new Set([...a, ...b]);
+export const intersection = (a, b) => new Set([...a].filter((x) => b.has(x)));
+export const difference = (a, b) => new Set([...a].filter((x) => !b.has(x)));
+
+// ---------- graph ----------
 export const graphDensity = (n, m) => (n < 2 ? 0 : (2 * m) / (n * (n - 1)));
 
 /** subjectId -> Set(studentId)  (each subject is a SET of students) */
@@ -70,21 +76,4 @@ export function maxClique(graph) {
   };
   bk([], new Set(graph.adj.map((_, i) => i)), new Set());
   return best;
-}
-
-export function connectedComponents(graph) {
-  const seen = new Set();
-  let count = 0;
-  for (let s = 0; s < graph.n; s++) {
-    if (seen.has(s)) continue;
-    count++;
-    const stack = [s];
-    while (stack.length) {
-      const v = stack.pop();
-      if (seen.has(v)) continue;
-      seen.add(v);
-      graph.adj[v].forEach((u) => !seen.has(u) && stack.push(u));
-    }
-  }
-  return count;
 }

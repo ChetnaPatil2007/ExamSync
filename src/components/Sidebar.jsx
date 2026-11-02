@@ -14,7 +14,7 @@ export const NAV = [
   { to: '/management?tab=rooms', label: 'Rooms & Venues', icon: Building2 },
   { section: 'Scheduling' },
   { to: '/scheduling?tab=slots', label: 'Time Slots', icon: Clock, isDefault: true },
-  { to: '/scheduling?tab=generate', label: 'Generate Timetable', icon: CalendarClock },
+  { to: '/scheduling?tab=generate', label: 'Exam Setup & Generate', icon: CalendarClock },
   { section: 'Conflicts' },
   { to: '/conflict-graph', label: 'Conflict Graph', icon: Network },
   { to: '/conflict-resolver', label: 'Conflict Resolver', icon: AlertTriangle },

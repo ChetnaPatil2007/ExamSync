@@ -2,9 +2,8 @@ import { useMemo, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { Play, RotateCcw } from 'lucide-react';
 import { Badge } from '../components/DataTable';
-import { useData, CHART_COLORS } from '../data/sampleData';
-import { buildConflictGraph, graphFromEdges, enrollmentSets, findInvalidEdges, maxClique } from '../algorithms/graphAlgorithms';
-import { union, intersection, difference } from '../algorithms/mathOperations';
+import { useData, CHART_COLORS, examSubjects } from '../data/sampleData';
+import { buildConflictGraph, graphFromEdges, enrollmentSets, findInvalidEdges, maxClique, union, intersection, difference } from '../algorithms/graphAlgorithms';
 import { greedyColoring, dsaturColoring, backtrackingSolve } from '../algorithms/schedulingAlgorithms';
 
 /* ---------- preset graphs ---------- */
@@ -23,9 +22,9 @@ function campus() {
   for (let i = 0; i < names.length; i++) for (let j = i + 1; j < names.length; j++) { const c = intersection(sets[i], sets[j]); if (c.size) pairs.push([i, j, [...c]]); }
   return { graph: graphFromEdges(names.map((n) => ({ id: n, label: n })), pairs), sets: CAMPUS };
 }
-const PRESET_LABELS = { live: 'Live dataset (all subjects)', campus: 'Small campus (6 subjects)', triangle: 'Triangle K3', k5: 'Complete graph K5', crown: 'Crown graph (n = 4)', path: 'Path P6' };
+const PRESET_LABELS = { live: 'Live dataset (exam subjects)', campus: 'Small campus (6 subjects)', triangle: 'Triangle K3', k5: 'Complete graph K5', crown: 'Crown graph (n = 4)', path: 'Path P6' };
 function getGraph(key, data) {
-  if (key === 'live') return { graph: buildConflictGraph(data.subjects, data.students) };
+  if (key === 'live') return { graph: buildConflictGraph(examSubjects(data), data.students) };
   if (key === 'campus') return campus();
   if (key === 'triangle') return { graph: letters(3, allPairs(3)) };
   if (key === 'k5') return { graph: letters(5, allPairs(5)) };

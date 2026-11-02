@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Table2, CalendarDays, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { Badge } from '../components/DataTable';
-import { useData, buildTimetableRows, fmtDate, todayISO, DEPT_SHORT } from '../data/sampleData';
+import { useData, buildTimetableRows, fmtDate, todayISO, DEPT_SHORT, examSubjects } from '../data/sampleData';
 
 export default function StudentPortal() {
   const { data } = useData();
@@ -15,7 +15,7 @@ export default function StudentPortal() {
   const all = useMemo(() => buildTimetableRows(data), [data]);
   // Only the exams of the student's enrolled subjects
   const mine = student ? all.filter((r) => student.subjects.includes(r.subjectId)) : [];
-  const notScheduled = student ? data.subjects.filter((s) => student.subjects.includes(s.id) && !all.some((r) => r.subjectId === s.id)) : [];
+  const notScheduled = student ? examSubjects(data).filter((s) => student.subjects.includes(s.id) && !all.some((r) => r.subjectId === s.id)) : [];
   const nextExam = mine.find((r) => r.date >= today);
   const clash = mine.some((a, i) => mine.some((b, j) => j > i && a.date === b.date && a.start < b.end && b.start < a.end));
 
@@ -33,7 +33,7 @@ export default function StudentPortal() {
             <div><span className="label">Name</span><div className="text-lg font-semibold text-slate-900">{student.name}</div></div>
             <div><span className="label">Roll number</span>{student.roll}</div>
             <div><span className="label">Department</span>{student.dept}</div>
-            <div><span className="label">Semester / Division</span>{student.semester} / {student.division}</div>
+            <div><span className="label">Year / Division</span>{student.year} / {student.division}</div>
             <div className="sm:col-span-2 lg:col-span-3"><span className="label">Enrolled subjects</span>
               <div className="flex flex-wrap gap-1.5">{student.subjects.map((sid) => { const s = data.subjects.find((x) => x.id === sid); return s && <Badge key={sid} color="blue">{s.code} – {s.name}</Badge>; })}</div></div>
             <div className="flex items-end">{clash ? <Badge color="red"><AlertTriangle size={12} className="mr-1" /> Personal clash detected</Badge> : <Badge color="green"><ShieldCheck size={12} className="mr-1" /> No clashes for this student</Badge>}</div>

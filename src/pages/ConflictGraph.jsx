@@ -4,7 +4,7 @@ import 'reactflow/dist/style.css';
 import StatCard from '../components/StatCard';
 import { Badge } from '../components/DataTable';
 import { Network, Share2, Percent, Hash, Layers, AlertTriangle } from 'lucide-react';
-import { useData, slotLabel, CHART_COLORS, DEPT_SHORT } from '../data/sampleData';
+import { useData, slotLabel, CHART_COLORS, DEPT_SHORT, examSubjects } from '../data/sampleData';
 import { buildConflictGraph, maxClique, findInvalidEdges } from '../algorithms/graphAlgorithms';
 import { cmpSlots } from '../algorithms/schedulingAlgorithms';
 
@@ -14,7 +14,8 @@ export default function ConflictGraph() {
   const posRef = useRef({});
 
   // The graph is rebuilt from live enrolment data on every change
-  const graph = useMemo(() => buildConflictGraph(data.subjects, data.students), [data.subjects, data.students]);
+  const subs = useMemo(() => examSubjects(data), [data.subjects, data.settings.plan]);
+  const graph = useMemo(() => buildConflictGraph(subs, data.students), [subs, data.students]);
   const clique = useMemo(() => maxClique(graph), [graph]);
   const slotsSorted = useMemo(() => [...data.slots].sort(cmpSlots), [data.slots]);
   const slotColor = useMemo(() => Object.fromEntries(slotsSorted.map((s, i) => [s.id, CHART_COLORS[i % CHART_COLORS.length]])), [slotsSorted]);
@@ -98,7 +99,7 @@ export default function ConflictGraph() {
           {!sel ? <p className="text-sm text-slate-500">Select a vertex to see its subject, degree, neighbours and slot. Its conflicting subjects will be highlighted in the graph.</p> : (
             <div className="space-y-3 text-sm">
               <div><div className="text-lg font-bold text-slate-900">{sel.label}</div><div className="text-slate-600">{sel.name}</div></div>
-              <div className="flex flex-wrap gap-2"><Badge color="blue">{DEPT_SHORT[sel.dept] || sel.dept}</Badge><Badge color="violet">Sem {sel.subject.semester}</Badge><Badge color="slate">{sel.size} students</Badge><Badge color="orange">Degree {graph.degree[selIdx]}</Badge></div>
+              <div className="flex flex-wrap gap-2"><Badge color="blue">{DEPT_SHORT[sel.dept] || sel.dept}</Badge><Badge color="violet">Year {sel.subject.year}</Badge><Badge color={sel.subject.type === 'Compulsory' ? 'blue' : 'orange'}>{sel.subject.type}</Badge><Badge color="slate">{sel.size} students</Badge><Badge color="orange">Degree {graph.degree[selIdx]}</Badge></div>
               <div><span className="label">Assigned slot</span>{assign[sel.id] ? slotLabel(slotMap[assign[sel.id].slotId]) : 'Not scheduled'}</div>
               <div><span className="label">Room</span>{assign[sel.id] ? roomMap[assign[sel.id].roomId]?.name || '—' : '—'}</div>
               <div>

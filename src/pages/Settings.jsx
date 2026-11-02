@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Save, RotateCcw } from 'lucide-react';
 import { ConfirmDialog } from '../components/Modal';
-import { useData, todayISO, applyExamWindow, rangeTooLong, MAX_DAYS } from '../data/sampleData';
+import { useData } from '../data/sampleData';
 
 const Section = ({ title, hint, children }) => (
   <div className="card p-5"><h2 className="text-sm font-semibold text-slate-900">{title}</h2>{hint && <p className="mb-4 mt-0.5 text-xs text-slate-500">{hint}</p>}<div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{children}</div></div>
@@ -25,32 +25,18 @@ export default function Settings() {
   };
 
   const save = () => {
-    if (s.startDate > s.endDate) return notify('Start date must be before end date', 'error');
     if (s.defaultDuration < 1) return notify('Default duration must be at least 1 hour', 'error');
-    if (s.morning.end <= s.morning.start || s.afternoon.end <= s.afternoon.start) return notify('Session end time must be after start time', 'error');
+    if (s.preferences.minOccupancy < 0 || s.preferences.minOccupancy > 100) return notify('Minimum room fill must be between 0 and 100', 'error');
     if (!s.university.name.trim() || !s.profile.name.trim()) return notify('University name and profile name are required', 'error');
-
-    // New examination dates: create the slots for them, regenerate the timetable and update every page
-    if (s.startDate !== data.settings.startDate || s.endDate !== data.settings.endDate) {
-      if (s.startDate < todayISO()) return notify('Choose a start date that is today or in the future', 'error');
-      if (rangeTooLong(s.startDate, s.endDate)) return notify(`The date range can be at most ${MAX_DAYS} days`, 'error');
-      const { res, patch } = applyExamWindow({ ...data, settings: s }, s.startDate, s.endDate);
-      setData((p) => ({ ...p, ...patch }));
-      log(`Examination dates changed to ${s.startDate} – ${s.endDate}: ${res.message}`);
-      return notify(res.assignments.length ? 'Settings saved – timetable regenerated for the new dates' : 'Settings saved, but no exam could be scheduled in the new dates', res.status === 'success' ? 'success' : 'warning');
-    }
-    setData((p) => ({ ...p, settings: s }));
+    setData((p) => ({ ...p, settings: { ...s, plan: p.settings.plan } }));   // the exam plan is edited in Scheduling → Exam Setup
     log('Settings updated'); notify('Settings saved');
   };
 
   return (
     <div className="space-y-6">
       <Section title="University details"><Field label="University name">{inp('university.name')}</Field><Field label="Address">{inp('university.address')}</Field><Field label="Examination session">{inp('university.session')}</Field></Section>
-      <Section title="Examination defaults" hint="Used as defaults when creating slots, subjects and when generating the timetable. Changing the dates creates slots for them and regenerates the timetable.">
+      <Section title="Examination defaults" hint="Exam dates, subjects and time slots are chosen in Scheduling → Exam Setup & Generate.">
         <Field label="Default exam duration (hours)">{inp('defaultDuration', 'number', { min: 1, max: 6 })}</Field>
-        <Field label="Default start date">{inp('startDate', 'date', { min: todayISO() })}</Field><Field label="Default end date">{inp('endDate', 'date', { min: s.startDate || todayISO() })}</Field>
-        <Field label="Morning session – start">{inp('morning.start', 'time')}</Field><Field label="Morning session – end">{inp('morning.end', 'time')}</Field><div />
-        <Field label="Afternoon session – start">{inp('afternoon.start', 'time')}</Field><Field label="Afternoon session – end">{inp('afternoon.end', 'time')}</Field>
       </Section>
       <Section title="Scheduling preferences" hint="These change the real algorithm used by Generate Timetable.">
         <Field label="Vertex selection strategy">
@@ -61,6 +47,7 @@ export default function Settings() {
           <select className="input" value={s.preferences.slotOrder} onChange={(e) => up('preferences.slotOrder', e.target.value)}>
             <option value="compact">Compact (earliest slots first)</option><option value="spread">Spread (least-used slot first)</option>
           </select></Field>
+        <Field label="Minimum room fill (%) – avoids huge rooms for few students">{inp('preferences.minOccupancy', 'number', { min: 0, max: 100, step: 5 })}</Field>
         <Field label="Backtracking search limit (nodes)">{inp('preferences.maxNodes', 'number', { min: 100, step: 1000 })}</Field>
         <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={s.preferences.useBacktracking} onChange={(e) => up('preferences.useBacktracking', e.target.checked)} /> Use recursive backtracking when greedy assignment gets stuck</label>
         <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={s.preferences.enforceFaculty} onChange={(e) => up('preferences.enforceFaculty', e.target.checked)} /> Enforce faculty availability and double-booking rules</label>

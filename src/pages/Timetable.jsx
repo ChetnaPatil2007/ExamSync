@@ -4,7 +4,7 @@ import { Printer, FileDown, Table2, CalendarDays, Search, ArrowUpDown } from 'lu
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Badge } from '../components/DataTable';
-import { useData, buildTimetableRows, fmtDate, DEPARTMENTS, DEPT_SHORT } from '../data/sampleData';
+import { useData, buildTimetableRows, fmtDate, DEPARTMENTS, DEPT_SHORT, examSubjects } from '../data/sampleData';
 
 export default function Timetable() {
   const { data, notify } = useData();
@@ -18,10 +18,10 @@ export default function Timetable() {
   const [asc, setAsc] = useState(true);
 
   const filtered = rows
-    .filter((r) => (!q || `${r.code} ${r.name}`.toLowerCase().includes(q.toLowerCase())) && (!dept || r.dept === dept) && (!sem || String(r.semester) === sem) && (!date || r.date === date) && (!room || r.roomId === room))
+    .filter((r) => (!q || `${r.code} ${r.name}`.toLowerCase().includes(q.toLowerCase())) && (!dept || r.dept === dept) && (!sem || String(r.year) === sem) && (!date || r.date === date) && (!room || r.roomId === room))
     .sort((a, b) => (asc ? 1 : -1) * (a.date.localeCompare(b.date) || a.start.localeCompare(b.start) || a.code.localeCompare(b.code)));
   const dates = [...new Set(rows.map((r) => r.date))];
-  const unscheduled = data.subjects.length - rows.length;
+  const unscheduled = examSubjects(data).length - rows.length;
 
   const exportPdf = () => {
     if (!filtered.length) return notify('Nothing to export – generate a timetable first', 'warning');
@@ -30,8 +30,8 @@ export default function Timetable() {
     doc.setFontSize(10); doc.text(`${data.settings.university.session}   |   Generated ${new Date().toLocaleString()}`, 14, 23);
     autoTable(doc, {
       startY: 29,
-      head: [['Date', 'Time', 'Code', 'Subject', 'Dept', 'Sem', 'Room', 'Faculty']],
-      body: filtered.map((r) => [fmtDate(r.date), `${r.start}-${r.end}`, r.code, r.name, DEPT_SHORT[r.dept] || r.dept, r.semester, `${r.roomName} (${r.building})`, r.faculty]),
+      head: [['Date', 'Time', 'Code', 'Subject', 'Dept', 'Year', 'Room', 'Faculty']],
+      body: filtered.map((r) => [fmtDate(r.date), `${r.start}-${r.end}`, r.code, r.name, DEPT_SHORT[r.dept] || r.dept, r.year, `${r.roomName} (${r.enrolled}/${r.capacity})`, r.faculty]),
       headStyles: { fillColor: [37, 99, 235] }, styles: { fontSize: 9 }, alternateRowStyles: { fillColor: [245, 247, 250] },
     });
     doc.save('ExamSync_Timetable.pdf');
@@ -43,7 +43,7 @@ export default function Timetable() {
       <div className="card flex flex-wrap items-center gap-3 p-4 print:hidden">
         <div className="relative min-w-[200px] flex-1"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input className="input pl-9" placeholder="Search subject or code…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <select className="input w-auto" value={dept} onChange={(e) => setDept(e.target.value)}><option value="">Department: All</option>{DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}</select>
-        <select className="input w-auto" value={sem} onChange={(e) => setSem(e.target.value)}><option value="">Semester: All</option>{[...new Set(data.subjects.map((s) => s.semester))].sort().map((s) => <option key={s}>{s}</option>)}</select>
+        <select className="input w-auto" value={sem} onChange={(e) => setSem(e.target.value)}><option value="">Year: All</option>{[...new Set(data.subjects.map((s) => s.year))].sort().map((s) => <option key={s}>{s}</option>)}</select>
         <select className="input w-auto" value={date} onChange={(e) => setDate(e.target.value)}><option value="">Date: All</option>{dates.map((d) => <option key={d} value={d}>{fmtDate(d)}</option>)}</select>
         <select className="input w-auto" value={room} onChange={(e) => setRoom(e.target.value)}><option value="">Room: All</option>{data.rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
         <button className="btn btn-outline" onClick={() => setAsc(!asc)}><ArrowUpDown size={15} /> {asc ? 'Earliest first' : 'Latest first'}</button>
@@ -67,13 +67,13 @@ export default function Timetable() {
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead><tr>{['Date', 'Time', 'Code', 'Subject', 'Dept', 'Sem', 'Room', 'Faculty / Invigilator'].map((h) => <th key={h} className="th">{h}</th>)}</tr></thead>
+              <thead><tr>{['Date', 'Time', 'Code', 'Subject', 'Dept', 'Year', 'Room', 'Faculty / Invigilator'].map((h) => <th key={h} className="th">{h}</th>)}</tr></thead>
               <tbody className="divide-y divide-slate-100">
                 {filtered.map((r) => (
                   <tr key={r.key} className="hover:bg-slate-50/70">
                     <td className="td whitespace-nowrap">{fmtDate(r.date)}</td><td className="td whitespace-nowrap">{r.start}–{r.end}</td>
-                    <td className="td font-semibold">{r.code}</td><td className="td">{r.name}</td><td className="td">{DEPT_SHORT[r.dept] || r.dept}</td><td className="td">{r.semester}</td>
-                    <td className="td"><Badge color="blue">{r.roomName}</Badge> <span className="text-xs text-slate-400">{r.building}</span></td><td className="td">{r.faculty}</td>
+                    <td className="td font-semibold">{r.code}</td><td className="td">{r.name}</td><td className="td">{DEPT_SHORT[r.dept] || r.dept}</td><td className="td">{r.year}</td>
+                    <td className="td"><Badge color="blue">{r.roomName}</Badge> <span className="text-xs text-slate-400">{r.building} · {r.enrolled}/{r.capacity} seats</span></td><td className="td">{r.faculty}</td>
                   </tr>
                 ))}
                 {!filtered.length && <tr><td colSpan={8} className="td py-10 text-center text-slate-400">No examinations match. Generate a timetable or adjust the filters.</td></tr>}
@@ -91,7 +91,7 @@ export default function Timetable() {
                   <div key={r.key} className={`rounded-lg border-l-4 bg-slate-50 p-3 ${r.session === 'Morning' ? 'border-blue-500' : 'border-violet-500'}`}>
                     <div className="flex items-center justify-between text-xs text-slate-500"><span>{r.start}–{r.end}</span><Badge color="blue">{r.roomName}</Badge></div>
                     <div className="mt-1 text-sm font-semibold text-slate-900">{r.code} · {r.name}</div>
-                    <div className="text-xs text-slate-500">{DEPT_SHORT[r.dept]} · Sem {r.semester} · {r.faculty}</div>
+                    <div className="text-xs text-slate-500">{DEPT_SHORT[r.dept]} · Year {r.year} · {r.faculty}</div>
                   </div>
                 ))}
               </div>

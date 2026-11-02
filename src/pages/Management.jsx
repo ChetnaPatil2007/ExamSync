@@ -19,7 +19,7 @@ function StudentsTab() {
     { name: 'roll', label: 'Roll number', required: true },
     { name: 'name', label: 'Student name', required: true },
     { name: 'dept', label: 'Department', type: 'select', options: deptOpts, required: true },
-    { name: 'semester', label: 'Semester', type: 'number', min: 1, max: 8, required: true, default: 3 },
+    { name: 'year', label: 'Year', type: 'number', min: 1, max: 4, required: true, default: 2 },
     { name: 'division', label: 'Division', type: 'select', options: ['A', 'B', 'C', 'D'], required: true },
     subjectField,
   ];
@@ -42,7 +42,7 @@ function StudentsTab() {
   const columns = [
     { key: 'roll', label: 'Roll No.' }, { key: 'name', label: 'Name' },
     { key: 'dept', label: 'Dept', render: (r) => DEPT_SHORT[r.dept] || r.dept },
-    { key: 'semester', label: 'Sem' }, { key: 'division', label: 'Div' },
+    { key: 'year', label: 'Year' }, { key: 'division', label: 'Div' },
     { key: 'subjects', label: 'Subjects', render: (r) => <div className="flex flex-wrap gap-1">{r.subjects.map((id) => subMap[id] && <Badge key={id} color="blue">{subMap[id].code}</Badge>)}</div> },
   ];
   return (
@@ -51,7 +51,7 @@ function StudentsTab() {
         columns={columns} rows={data.students} searchKeys={['name', 'roll']} searchPlaceholder="Search by name or roll number…"
         filters={[
           { key: 'dept', label: 'Department', options: DEPARTMENTS },
-          { key: 'semester', label: 'Semester', options: [...new Set(data.students.map((s) => s.semester))].sort() },
+          { key: 'year', label: 'Year', options: [...new Set(data.students.map((s) => s.year))].sort() },
           { key: 'division', label: 'Division', options: [...new Set(data.students.map((s) => s.division))].sort() },
         ]}
         toolbar={<AddBtn onClick={() => setForm({ mode: 'add' })}>Add student</AddBtn>}
@@ -84,7 +84,8 @@ function SubjectsTab() {
     { name: 'code', label: 'Subject code', required: true },
     { name: 'name', label: 'Subject name', required: true },
     { name: 'dept', label: 'Department', type: 'select', options: deptOpts, required: true },
-    { name: 'semester', label: 'Semester', type: 'number', min: 1, max: 8, required: true, default: 3 },
+    { name: 'year', label: 'Year', type: 'number', min: 1, max: 4, required: true, default: 2 },
+    { name: 'type', label: 'Subject type', type: 'select', options: ['Compulsory', 'Elective'], required: true, default: 'Compulsory' },
     { name: 'facultyId', label: 'Assigned faculty', type: 'select', options: data.faculty.map((f) => ({ value: f.id, label: f.name })), placeholder: '— None —' },
     { name: 'duration', label: 'Exam duration (hours)', type: 'number', min: 1, max: 6, required: true, default: data.settings.defaultDuration },
     { name: 'enrolled', label: 'Enrolled students', type: 'multiselect', options: data.students.map((s) => ({ value: s.id, label: `${s.roll} — ${s.name}` })) },
@@ -118,7 +119,8 @@ function SubjectsTab() {
   const columns = [
     { key: 'code', label: 'Code', render: (r) => <span className="font-semibold">{r.code}</span> },
     { key: 'id', label: 'ID' }, { key: 'name', label: 'Subject' },
-    { key: 'dept', label: 'Dept', render: (r) => DEPT_SHORT[r.dept] || r.dept }, { key: 'semester', label: 'Sem' },
+    { key: 'dept', label: 'Dept', render: (r) => DEPT_SHORT[r.dept] || r.dept }, { key: 'year', label: 'Year' },
+    { key: 'type', label: 'Type', render: (r) => <Badge color={r.type === 'Compulsory' ? 'blue' : 'orange'}>{r.type}</Badge> },
     { key: 'facultyName', label: 'Faculty' },
     { key: 'enrolledCount', label: 'Students', render: (r) => <Badge color="violet">{r.enrolledCount}</Badge> },
     { key: 'duration', label: 'Duration', render: (r) => `${r.duration} h` },
@@ -128,7 +130,7 @@ function SubjectsTab() {
     <>
       <DataTable
         columns={columns} rows={rows} searchKeys={['name', 'code']} searchPlaceholder="Search by code or name…"
-        filters={[{ key: 'dept', label: 'Department', options: DEPARTMENTS }, { key: 'semester', label: 'Semester', options: [...new Set(data.subjects.map((s) => s.semester))].sort() }]}
+        filters={[{ key: 'dept', label: 'Department', options: DEPARTMENTS }, { key: 'year', label: 'Year', options: [...new Set(data.subjects.map((s) => s.year))].sort() }, { key: 'type', label: 'Type', options: ['Compulsory', 'Elective'] }]}
         toolbar={<AddBtn onClick={() => setForm({ mode: 'add' })}>Add subject</AddBtn>}
         actions={(r) => (<>
           <IconBtn icon={Eye} title="View details & students" onClick={() => setView(r)} />
@@ -141,13 +143,13 @@ function SubjectsTab() {
       <Modal open={!!view} onClose={() => setView(null)} title={view ? `${view.code} – ${view.name}` : ''} size="lg">
         {view && (<>
           <div className="mb-4 grid gap-2 text-sm sm:grid-cols-3">
-            <div><span className="label">Department</span>{view.dept}</div><div><span className="label">Semester</span>{view.semester}</div>
+            <div><span className="label">Department</span>{view.dept}</div><div><span className="label">Year</span>{view.year}</div>
             <div><span className="label">Faculty</span>{view.facultyName}</div><div><span className="label">Duration</span>{view.duration} hours</div>
-            <div><span className="label">Subject ID</span>{view.id}</div><div><span className="label">Enrolled</span>{viewStudents.length} students</div>
+            <div><span className="label">Type</span>{view.type}</div><div><span className="label">Enrolled</span>{viewStudents.length} students</div>
           </div>
           <div className="max-h-72 overflow-y-auto rounded-lg border border-slate-200">
-            <table className="w-full"><thead><tr><th className="th">Roll</th><th className="th">Name</th><th className="th">Dept</th><th className="th">Sem</th></tr></thead>
-              <tbody className="divide-y divide-slate-100">{viewStudents.map((s) => <tr key={s.id}><td className="td">{s.roll}</td><td className="td">{s.name}</td><td className="td">{DEPT_SHORT[s.dept]}</td><td className="td">{s.semester}</td></tr>)}</tbody></table>
+            <table className="w-full"><thead><tr><th className="th">Roll</th><th className="th">Name</th><th className="th">Dept</th><th className="th">Year</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">{viewStudents.map((s) => <tr key={s.id}><td className="td">{s.roll}</td><td className="td">{s.name}</td><td className="td">{DEPT_SHORT[s.dept]}</td><td className="td">{s.year}</td></tr>)}</tbody></table>
           </div>
         </>)}
       </Modal>
@@ -212,7 +214,7 @@ function FacultyTab() {
       <ConfirmDialog open={!!del} danger confirmText="Delete" title="Delete faculty" message={`Delete ${del?.name}? Their subjects will become unassigned.`} onConfirm={remove} onCancel={() => setDel(null)} />
       <Modal open={!!view} onClose={() => setView(null)} title={view ? `Subjects – ${view.name}` : ''}>
         {view && (assigned(view.id).length
-          ? <ul className="space-y-2">{assigned(view.id).map((s) => <li key={s.id} className="flex justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"><span><b>{s.code}</b> · {s.name}</span><Badge color="violet">Sem {s.semester}</Badge></li>)}</ul>
+          ? <ul className="space-y-2">{assigned(view.id).map((s) => <li key={s.id} className="flex justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"><span><b>{s.code}</b> · {s.name}</span><Badge color="violet">Year {s.year}</Badge></li>)}</ul>
           : <p className="text-sm text-slate-500">No subjects assigned.</p>)}
       </Modal>
     </>
