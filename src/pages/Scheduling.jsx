@@ -4,8 +4,8 @@ import { Plus, Pencil, Trash2, Clock, CalendarClock, Play, Wand2, CheckCircle2, 
 import DataTable, { Badge, IconBtn } from '../components/DataTable';
 import { FormModal, ConfirmDialog } from '../components/Modal';
 import StatCard from '../components/StatCard';
-import { useData, DEPARTMENTS, nextId, fmtDate, slotLabel, summariseGeneration, isoDate } from '../data/sampleData';
-import { generateSchedule, slotsOverlap, cmpSlots } from '../algorithms/schedulingAlgorithms';
+import { useData, DEPARTMENTS, nextId, fmtDate, slotLabel, todayISO, buildRangeSlots, applyExamWindow, rangeTooLong, MAX_DAYS } from '../data/sampleData';
+import { slotsOverlap, cmpSlots } from '../algorithms/schedulingAlgorithms';
 
 /* ====================== A. TIME SLOTS ====================== */
 function SlotsTab() {
@@ -40,20 +40,10 @@ function SlotsTab() {
     log(`Deleted time slot ${del.id}`); notify('Time slot deleted'); setDel(null);
   };
 
-  // Uses the Morning / Afternoon timings from Settings
+  // Uses the Morning / Afternoon timings and the start / end dates from Settings
   const autoGenerate = () => {
     const { startDate, endDate, morning, afternoon } = data.settings;
-    const created = [];
-    let slots = [...data.slots];
-    for (let d = new Date(startDate + 'T00:00:00'); isoDate(d) <= endDate; d.setDate(d.getDate() + 1)) {
-      if (d.getDay() === 0 || d.getDay() === 6) continue;
-      [['Morning', morning], ['Afternoon', afternoon]].forEach(([session, t]) => {
-        const cand = { date: isoDate(d), start: t.start, end: t.end, session, available: true };
-        if (slots.some((s) => slotsOverlap(s, cand))) return;
-        const slot = { id: nextId('S', slots), ...cand };
-        slots = [...slots, slot]; created.push(slot);
-      });
-    }
+    const created = buildRangeSlots(data.slots, startDate, endDate, morning, afternoon);
     if (!created.length) return notify('No new slots needed – the date range is already covered', 'info');
     setData((p) => ({ ...p, slots: [...p.slots, ...created], faculty: p.faculty.map((f) => ({ ...f, availability: [...f.availability, ...created.map((s) => s.id)] })) }));
     log(`Auto-generated ${created.length} time slots from Settings`); notify(`${created.length} slots created`);
@@ -100,17 +90,23 @@ function GenerateTab() {
   const [result, setResult] = useState(null);
   const [confirm, setConfirm] = useState(false);
 
-  const inRange = useMemo(() => [...data.slots].filter((x) => x.date >= startDate && x.date <= endDate).sort(cmpSlots), [data.slots, startDate, endDate]);
+  // Slots missing for the chosen dates are created automatically when you generate; they are previewed here as "new"
+  const fresh = useMemo(() => buildRangeSlots(data.slots, startDate, endDate, s.morning, s.afternoon), [data.slots, startDate, endDate, s.morning, s.afternoon]);
+  const newIds = useMemo(() => new Set(fresh.map((x) => x.id)), [fresh]);
+  const inRange = useMemo(() => [...data.slots.filter((x) => x.date >= startDate && x.date <= endDate), ...fresh].sort(cmpSlots), [data.slots, fresh, startDate, endDate]);
   useEffect(() => { setSelSlots(inRange.filter((x) => x.available).map((x) => x.id)); }, [inRange]);
   const toggle = (arr, set, id) => set(arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
 
   const run = () => {
     setConfirm(false);
-    const res = generateSchedule(data, { startDate, endDate, slotIds: selSlots, roomIds: selRooms, dept, semester, duration });
+    if (!startDate || !endDate || startDate > endDate) return notify('Start date must be on or before the end date', 'error');
+    if (startDate < todayISO()) return notify('Choose a start date that is today or in the future', 'error');
+    if (rangeTooLong(startDate, endDate)) return notify(`The date range can be at most ${MAX_DAYS} days`, 'error');
+    const { res, patch } = applyExamWindow(data, startDate, endDate, { slotIds: selSlots, roomIds: selRooms, dept, semester, duration });
     setResult(res);
+    setData((p) => ({ ...p, ...patch }));   // saves the dates, new slots and timetable → every page updates
     if (res.assignments.length > 0) {
-      setData((p) => ({ ...p, timetable: res.timetable, lastGeneration: summariseGeneration(res) }));
-      log(`Timetable generated: ${res.message}`);
+      log(`Timetable generated for ${startDate} to ${endDate}: ${res.message}`);
       notify(res.status === 'success' ? 'Timetable generated successfully' : 'Timetable generated with unscheduled exams', res.status === 'success' ? 'success' : 'warning');
     } else {
       log('Timetable generation failed'); notify('Generation failed – see the reasons below', 'error');
@@ -127,8 +123,8 @@ function GenerateTab() {
       <div className="card p-5">
         <h2 className="mb-4 text-sm font-semibold text-slate-900">Generation settings</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <div><label className="label">Start date</label><input type="date" className="input" value={startDate} onChange={(e) => setStart(e.target.value)} /></div>
-          <div><label className="label">End date</label><input type="date" className="input" value={endDate} onChange={(e) => setEnd(e.target.value)} /></div>
+          <div><label className="label">Start date</label><input type="date" className="input" min={todayISO()} value={startDate} onChange={(e) => setStart(e.target.value)} /></div>
+          <div><label className="label">End date</label><input type="date" className="input" min={startDate || todayISO()} value={endDate} onChange={(e) => setEnd(e.target.value)} /></div>
           <div><label className="label">Department</label><select className="input" value={dept} onChange={(e) => setDept(e.target.value)}><option>All</option>{DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}</select></div>
           <div><label className="label">Semester</label><select className="input" value={semester} onChange={(e) => setSem(e.target.value)}><option>All</option>{[...new Set(data.subjects.map((x) => x.semester))].sort().map((x) => <option key={x}>{x}</option>)}</select></div>
           <div><label className="label">Exam duration (h)</label><input type="number" min="1" max="6" className="input" value={duration} onChange={(e) => setDur(e.target.value)} /></div>
@@ -140,10 +136,10 @@ function GenerateTab() {
             <div className="grid max-h-44 gap-1 overflow-y-auto rounded-lg border border-slate-200 p-2">
               {inRange.map((x) => (
                 <label key={x.id} className={`flex cursor-pointer items-center gap-2 text-sm ${x.available ? '' : 'text-slate-400 line-through'}`}>
-                  <input type="checkbox" disabled={!x.available} checked={selSlots.includes(x.id)} onChange={() => toggle(selSlots, setSelSlots, x.id)} /> {x.id} · {slotLabel(x)}
+                  <input type="checkbox" disabled={!x.available} checked={selSlots.includes(x.id)} onChange={() => toggle(selSlots, setSelSlots, x.id)} /> {x.id} · {slotLabel(x)}{newIds.has(x.id) && <span className="text-xs text-blue-600">(new)</span>}
                 </label>
               ))}
-              {!inRange.length && <span className="text-xs text-slate-400">No slots in this date range.</span>}
+              {!inRange.length && <span className="text-xs text-slate-400">No weekdays in this date range.</span>}
             </div>
           </div>
           <div>

@@ -2,13 +2,14 @@
 //  sampleData.js – sample dataset, LocalStorage, shared context & selectors
 // ============================================================
 import { createContext, useContext } from 'react';
-import { generateSchedule, validateSchedule, cmpSlots } from '../algorithms/schedulingAlgorithms';
+import { generateSchedule, validateSchedule, cmpSlots, slotsOverlap } from '../algorithms/schedulingAlgorithms';
 
 export const STORAGE_KEY = 'examsync-data-v1';
 export const DEPARTMENTS = ['Computer Science', 'Information Technology', 'Electronics', 'Mechanical Engineering'];
 export const DEPT_SHORT = { 'Computer Science': 'CS', 'Information Technology': 'IT', Electronics: 'EC', 'Mechanical Engineering': 'ME' };
 export const CHART_COLORS = ['#2563eb', '#7c3aed', '#16a34a', '#f97316', '#dc2626', '#0891b2', '#db2777', '#ca8a04', '#4f46e5', '#0d9488'];
 export const CONFLICT_TYPES = ['Student', 'Room', 'Faculty', 'Capacity', 'Availability'];
+export const MAX_DAYS = 366;   // longest examination window the app will create slots for
 
 // ---------- shared context (provider lives in App.jsx) ----------
 export const DataContext = createContext(null);
@@ -44,6 +45,60 @@ function nextWorkdays(count, offsetDays = 7) {
     d.setDate(d.getDate() + 1);
   }
   return out;
+}
+
+// ---------- examination window (user-chosen dates) ----------
+export const rangeTooLong = (start, end) => (new Date(end + 'T00:00:00') - new Date(start + 'T00:00:00')) / 864e5 > MAX_DAYS;
+
+/** Morning + Afternoon slots (weekdays only) for every day of the range that is not covered yet. */
+export function buildRangeSlots(existing, startDate, endDate, morning, afternoon) {
+  if (!startDate || !endDate || startDate > endDate || rangeTooLong(startDate, endDate)) return [];
+  const created = [];
+  let all = [...existing];
+  for (let d = new Date(startDate + 'T00:00:00'); isoDate(d) <= endDate; d.setDate(d.getDate() + 1)) {
+    if (d.getDay() === 0 || d.getDay() === 6) continue;
+    [['Morning', morning], ['Afternoon', afternoon]].forEach(([session, t]) => {
+      const cand = { date: isoDate(d), start: t.start, end: t.end, session, available: true };
+      if (all.some((s) => slotsOverlap(s, cand))) return;
+      const slot = { id: nextId('S', all), ...cand };
+      all = [...all, slot]; created.push(slot);
+    });
+  }
+  return created;
+}
+
+/**
+ * Moves the whole examination window to [startDate, endDate]:
+ *  1. creates the missing slots for those dates (and makes every faculty member available in them),
+ *  2. generates the timetable,
+ *  3. saves the dates in Settings,
+ *  4. when ALL subjects were scheduled, removes older slots outside the window that nothing uses.
+ * Returns { res, patch, created } – apply with setData((p) => ({ ...p, ...patch })).
+ */
+export function applyExamWindow(data, startDate, endDate, opts = {}) {
+  const { slotIds, roomIds, dept = 'All', semester = 'All', duration } = opts;
+  const st = data.settings;
+  const created = buildRangeSlots(data.slots, startDate, endDate, st.morning, st.afternoon);
+  const createdIds = created.map((x) => x.id);
+  const base = {
+    ...data,
+    slots: [...data.slots, ...created],
+    faculty: data.faculty.map((f) => ({ ...f, availability: [...f.availability, ...createdIds] })),
+  };
+  const res = generateSchedule(base, { startDate, endDate, slotIds, roomIds, dept, semester, duration });
+  let patch = { slots: base.slots, faculty: base.faculty, settings: { ...st, startDate, endDate } };
+  if (res.assignments.length > 0) {
+    let { slots, faculty } = base;
+    if (dept === 'All' && semester === 'All') {
+      const used = new Set(res.timetable.map((e) => e.slotId));
+      const keep = (x) => (x.date >= startDate && x.date <= endDate) || used.has(x.id);
+      const dropped = new Set(slots.filter((x) => !keep(x)).map((x) => x.id));
+      slots = slots.filter(keep);
+      faculty = faculty.map((f) => ({ ...f, availability: f.availability.filter((id) => !dropped.has(id)) }));
+    }
+    patch = { ...patch, slots, faculty, timetable: res.timetable, lastGeneration: summariseGeneration(res) };
+  }
+  return { res, patch, created };
 }
 
 // ---------- sample dataset ----------

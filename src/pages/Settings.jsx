@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Save, RotateCcw } from 'lucide-react';
 import { ConfirmDialog } from '../components/Modal';
-import { useData } from '../data/sampleData';
+import { useData, todayISO, applyExamWindow, rangeTooLong, MAX_DAYS } from '../data/sampleData';
 
 const Section = ({ title, hint, children }) => (
   <div className="card p-5"><h2 className="text-sm font-semibold text-slate-900">{title}</h2>{hint && <p className="mb-4 mt-0.5 text-xs text-slate-500">{hint}</p>}<div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{children}</div></div>
@@ -29,6 +29,16 @@ export default function Settings() {
     if (s.defaultDuration < 1) return notify('Default duration must be at least 1 hour', 'error');
     if (s.morning.end <= s.morning.start || s.afternoon.end <= s.afternoon.start) return notify('Session end time must be after start time', 'error');
     if (!s.university.name.trim() || !s.profile.name.trim()) return notify('University name and profile name are required', 'error');
+
+    // New examination dates: create the slots for them, regenerate the timetable and update every page
+    if (s.startDate !== data.settings.startDate || s.endDate !== data.settings.endDate) {
+      if (s.startDate < todayISO()) return notify('Choose a start date that is today or in the future', 'error');
+      if (rangeTooLong(s.startDate, s.endDate)) return notify(`The date range can be at most ${MAX_DAYS} days`, 'error');
+      const { res, patch } = applyExamWindow({ ...data, settings: s }, s.startDate, s.endDate);
+      setData((p) => ({ ...p, ...patch }));
+      log(`Examination dates changed to ${s.startDate} – ${s.endDate}: ${res.message}`);
+      return notify(res.assignments.length ? 'Settings saved – timetable regenerated for the new dates' : 'Settings saved, but no exam could be scheduled in the new dates', res.status === 'success' ? 'success' : 'warning');
+    }
     setData((p) => ({ ...p, settings: s }));
     log('Settings updated'); notify('Settings saved');
   };
@@ -36,9 +46,9 @@ export default function Settings() {
   return (
     <div className="space-y-6">
       <Section title="University details"><Field label="University name">{inp('university.name')}</Field><Field label="Address">{inp('university.address')}</Field><Field label="Examination session">{inp('university.session')}</Field></Section>
-      <Section title="Examination defaults" hint="Used as defaults when creating slots, subjects and when generating the timetable.">
+      <Section title="Examination defaults" hint="Used as defaults when creating slots, subjects and when generating the timetable. Changing the dates creates slots for them and regenerates the timetable.">
         <Field label="Default exam duration (hours)">{inp('defaultDuration', 'number', { min: 1, max: 6 })}</Field>
-        <Field label="Default start date">{inp('startDate', 'date')}</Field><Field label="Default end date">{inp('endDate', 'date')}</Field>
+        <Field label="Default start date">{inp('startDate', 'date', { min: todayISO() })}</Field><Field label="Default end date">{inp('endDate', 'date', { min: s.startDate || todayISO() })}</Field>
         <Field label="Morning session – start">{inp('morning.start', 'time')}</Field><Field label="Morning session – end">{inp('morning.end', 'time')}</Field><div />
         <Field label="Afternoon session – start">{inp('afternoon.start', 'time')}</Field><Field label="Afternoon session – end">{inp('afternoon.end', 'time')}</Field>
       </Section>
